@@ -2,6 +2,13 @@
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────
 
+var PROVIDER_META = {
+  openrouter: { placeholder: 'sk-or-v1-…',      defaultModel: 'anthropic/claude-haiku-4-5', hint: '(openrouter.ai/models)' },
+  anthropic:  { placeholder: 'sk-ant-api03-…',   defaultModel: 'claude-haiku-4-5',           hint: '(docs.anthropic.com/models)' },
+  openai:     { placeholder: 'sk-…',             defaultModel: 'gpt-4o-mini',                hint: '(platform.openai.com/docs/models)' },
+  gemini:     { placeholder: 'AIzaSy…',          defaultModel: 'gemini-2.0-flash',           hint: '(ai.google.dev/models)' }
+};
+
 document.addEventListener('DOMContentLoaded', function () {
   loadSettings();
   loadVocabSummary();
@@ -9,6 +16,12 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('save-key').addEventListener('click', saveApiKey);
   document.getElementById('api-key-input').addEventListener('keydown', function (e) {
     if (e.key === 'Enter') saveApiKey();
+  });
+
+  document.getElementById('provider-select').addEventListener('change', function (e) {
+    var provider = e.target.value;
+    chrome.storage.local.set({ provider: provider });
+    applyProviderMeta(provider);
   });
 
   document.getElementById('target-lang').addEventListener('change', function (e) {
@@ -26,13 +39,23 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('clear-all').addEventListener('click', confirmClearAll);
 });
 
+function applyProviderMeta(provider) {
+  var meta = PROVIDER_META[provider] || PROVIDER_META.openrouter;
+  document.getElementById('api-key-input').placeholder = meta.placeholder;
+  document.getElementById('model-input').placeholder   = meta.defaultModel;
+  document.getElementById('model-hint').textContent    = meta.hint;
+}
+
 // ── Settings ──────────────────────────────────────────────────────────────
 
 function loadSettings() {
-  chrome.storage.local.get(['apiKey', 'targetLang', 'modelName'], function (result) {
+  chrome.storage.local.get(['apiKey', 'targetLang', 'modelName', 'provider'], function (result) {
+    var provider = result.provider || 'openrouter';
+    document.getElementById('provider-select').value = provider;
+    applyProviderMeta(provider);
+
     if (result.apiKey) {
-      var input = document.getElementById('api-key-input');
-      input.placeholder = '••••••••••••' + result.apiKey.slice(-4);
+      document.getElementById('api-key-input').placeholder = '••••••••••••' + result.apiKey.slice(-4);
       setStatus('key-status', 'API key saved', 'ok');
     }
     if (result.targetLang) {
@@ -166,7 +189,7 @@ function exportCSV() {
     });
 
     var csv  = [headers.map(csvField).join(',')].concat(rows).join('\r\n');
-    var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    var blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
     var url  = URL.createObjectURL(blob);
 
     var today = new Date().toISOString().slice(0, 10);

@@ -319,7 +319,17 @@
     <div class="section-title">Settings</div>
 
     <div class="field">
-      <label class="label" for="api-key-input">OpenRouter API Key</label>
+      <label class="label" for="provider-select">Provider</label>
+      <select id="provider-select" class="select">
+        <option value="openrouter">OpenRouter</option>
+        <option value="anthropic">Anthropic (Claude)</option>
+        <option value="openai">OpenAI</option>
+        <option value="gemini">Google Gemini</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label class="label" for="api-key-input">API Key</label>
       <div class="input-row">
         <input
           type="password"
@@ -335,7 +345,7 @@
     </div>
 
     <div class="field">
-      <label class="label" for="model-input">Model <span style="color:#475569;font-weight:400">(openrouter.ai/models)</span></label>
+      <label class="label" for="model-input">Model <span id="model-hint" style="color:#475569;font-weight:400"></span></label>
       <input
         type="text"
         id="model-input"
