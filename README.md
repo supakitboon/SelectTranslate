@@ -8,7 +8,7 @@
 
 | Translation Popup | Settings & Vocabulary |
 |:---:|:---:|
-| ![Translation popup showing word analysis on The Guardian](<Screenshot 2026-04-27 091054.png>) | ![Extension settings panel and vocabulary list](<Screenshot 2026-04-26 100256.png>) |
+| ![Translation popup showing word analysis on The Guardian](screenshots/popup.png) | ![Extension settings panel and vocabulary list](screenshots/settings.png) |
 | Highlight a word on any webpage to get an instant translation, part-of-speech tag, definition, and example sentence | Manage your API key, provider, target language, and review saved vocabulary — all from the extension popup |
 
 ---
