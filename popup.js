@@ -37,6 +37,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   document.getElementById('export-csv').addEventListener('click', exportCSV);
   document.getElementById('clear-all').addEventListener('click', confirmClearAll);
+  document.getElementById('toggle-btn').addEventListener('click', toggleEnabled);
 });
 
 function applyProviderMeta(provider) {
@@ -49,7 +50,7 @@ function applyProviderMeta(provider) {
 // ── Settings ──────────────────────────────────────────────────────────────
 
 function loadSettings() {
-  chrome.storage.local.get(['apiKey', 'targetLang', 'modelName', 'provider'], function (result) {
+  chrome.storage.local.get(['apiKey', 'targetLang', 'modelName', 'provider', 'enabled'], function (result) {
     var provider = result.provider || 'openrouter';
     document.getElementById('provider-select').value = provider;
     applyProviderMeta(provider);
@@ -64,7 +65,33 @@ function loadSettings() {
     if (result.modelName) {
       document.getElementById('model-input').value = result.modelName;
     }
+    updateToggle(result.enabled !== false);
   });
+}
+
+function toggleEnabled() {
+  chrome.storage.local.get(['enabled'], function (result) {
+    var next = result.enabled === false;
+    chrome.storage.local.set({ enabled: next }, function () {
+      updateToggle(next);
+    });
+  });
+}
+
+function updateToggle(enabled) {
+  var btn   = document.getElementById('toggle-btn');
+  var label = document.getElementById('toggle-label');
+  if (enabled) {
+    btn.classList.remove('off');
+    btn.setAttribute('aria-checked', 'true');
+    label.textContent = 'ON';
+    label.classList.remove('off');
+  } else {
+    btn.classList.add('off');
+    btn.setAttribute('aria-checked', 'false');
+    label.textContent = 'OFF';
+    label.classList.add('off');
+  }
 }
 
 function saveApiKey() {

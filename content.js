@@ -100,7 +100,14 @@
       '.lc-error{display:block!important;color:#FCA5A5!important;font-size:12px!important;',
         'background:rgba(239,68,68,.08)!important;padding:6px 10px!important;',
         'border-radius:6px!important;border:1px solid rgba(239,68,68,.15)!important;',
-        'line-height:1.4!important;width:100%!important;}'
+        'line-height:1.4!important;width:100%!important;}',
+      '.lc-speak{all:unset!important;display:flex!important;align-items:center!important;',
+        'justify-content:center!important;width:24px!important;height:24px!important;',
+        'border-radius:6px!important;color:#818CF8!important;font-size:14px!important;',
+        'cursor:pointer!important;flex-shrink:0!important;margin-top:2px!important;',
+        'transition:color .15s,background .15s!important;}',
+      '.lc-speak:hover{background:rgba(129,140,248,.18)!important;}',
+      '.lc-speak.speaking{color:#A5F3FC!important;}'
     ].join('');
     (document.head || document.documentElement).appendChild(s);
   })();
@@ -166,6 +173,18 @@
     'font-size:11.5px!important;font-style:italic!important;font-weight:400!important;' +
     'font-family:Georgia,"Times New Roman",serif!important;' +
     'line-height:1.6!important;word-break:break-word!important;';
+
+  function speakWord(text, btn) {
+    if (!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    var utter = new SpeechSynthesisUtterance(text);
+    if (btn) {
+      btn.classList.add('speaking');
+      utter.onend = function () { btn.classList.remove('speaking'); };
+      utter.onerror = function () { btn.classList.remove('speaking'); };
+    }
+    window.speechSynthesis.speak(utter);
+  }
 
   function stripMarkdown(str) {
     return String(str)
@@ -273,6 +292,7 @@
           '<div class="lc-word" title="' + escapeHtml(selectedText) + '">' + escapeHtml(selectedText) + '</div>' +
           '<div class="lc-word-trans"><span class="lc-spinner-text">translating…</span></div>' +
         '</div>' +
+        '<button class="lc-speak" aria-label="Pronounce" title="Listen to pronunciation">🔊</button>' +
         '<button class="lc-close" aria-label="Close">✕</button>' +
       '</div>' +
       '<div class="lc-divider"></div>' +
@@ -287,6 +307,13 @@
     popup.querySelector('.lc-close').addEventListener('click', function (e) {
       e.stopPropagation();
       removePopup();
+    });
+
+    var wordToSpeak = selectedText;
+    var speakBtn = popup.querySelector('.lc-speak');
+    speakBtn.addEventListener('click', function (e) {
+      e.stopPropagation();
+      speakWord(wordToSpeak, speakBtn);
     });
 
     repositionPopup(popup);
@@ -329,22 +356,50 @@
 
         // Step 3 — analyze
         sendMsg({ action: 'analyze', text: selectedText, targetLang: targetLang }, function (analRes) {
-          if (!popup.isConnected) return;
-          var aDiv = popup.querySelector('.lc-analysis');
-          if (!aDiv) return;
-
           var pos        = (analRes && !analRes.error) ? (analRes.part_of_speech || '') : '';
           var definition = (analRes && !analRes.error) ? (analRes.definition     || '') : '';
           var example    = (analRes && !analRes.error) ? (analRes.example        || '') : '';
           var baseForm   = (analRes && !analRes.error) ? (analRes.base_form      || null) : null;
 
-          // Update displayed word to base form if different (e.g. “walked” → “walk”)
-          var displayWord = baseForm || selectedText;
+          // Step 4 — save using base form when available (always run, even if popup was closed)
+          var VALID_POS = ['noun', 'verb', 'adjective', 'adverb', 'idiom', 'phrase'];
+          if (savedTranslation && VALID_POS.indexOf(pos.toLowerCase()) !== -1) {
+            var saveOriginal   = baseForm || selectedText;
+            var saveNormalized = saveOriginal.toLowerCase().trim();
+            sendMsg({
+              action: 'saveWord',
+              data: {
+                original:        saveOriginal,
+                normalized:      saveNormalized,
+                translation:     savedTranslation,
+                part_of_speech:  pos,
+                definition:      definition,
+                example:         example,
+                target_language: targetLang,
+                page_url:        window.location.href
+              }
+            }, function (saveRes) {
+              if (!saveRes || !popup.isConnected) return;
+              var badge = popup.querySelector('.lc-badge');
+              if (!badge) return;
+              var newCount = saveRes.count || 1;
+              badge.textContent = String(newCount);
+              badge.style.setProperty('background-color', badgeColor(newCount), 'important');
+              badge.title = 'You’ve looked this up ' + newCount + ' time(s)';
+            });
+          }
+
+          // UI updates — skip if popup was closed before analysis finished
+          if (!popup.isConnected) return;
+          var aDiv = popup.querySelector('.lc-analysis');
+          if (!aDiv) return;
+
           var wordEl = popup.querySelector('.lc-word');
           if (wordEl && baseForm && baseForm.toLowerCase() !== selectedText.toLowerCase()) {
             wordEl.textContent = baseForm;
             wordEl.title = baseForm;
           }
+          if (baseForm) wordToSpeak = baseForm;
 
           aDiv.innerHTML = '';
 
@@ -408,26 +463,6 @@
           aDiv.appendChild(exEl);
 
           repositionPopup(popup);
-
-          // Step 4 — save using base form when available
-          var VALID_POS = ['noun', 'verb', 'adjective', 'adverb', 'idiom', 'phrase'];
-          if (savedTranslation && VALID_POS.indexOf(pos.toLowerCase()) !== -1) {
-            var saveOriginal = baseForm || selectedText;
-            var saveNormalized = saveOriginal.toLowerCase().trim();
-            sendMsg({
-              action: 'saveWord',
-              data: {
-                original:        saveOriginal,
-                normalized:      saveNormalized,
-                translation:     savedTranslation,
-                part_of_speech:  pos,
-                definition:      definition,
-                example:         example,
-                target_language: targetLang,
-                page_url:        window.location.href
-              }
-            }, null);
-          }
         });
       });
     }
@@ -461,11 +496,14 @@
       var sel  = window.getSelection();
       var text = sel ? sel.toString().trim() : '';
       if (!text) return;
-      if (text.length > 500) {
-        showErrorPopup('Selection too long (max 500 chars)', e.clientX, e.clientY);
-        return;
-      }
-      showPopup(text, e.clientX, e.clientY);
+      chrome.storage.local.get(['enabled'], function (result) {
+        if (result.enabled === false) return;
+        if (text.length > 500) {
+          showErrorPopup('Selection too long (max 500 chars)', e.clientX, e.clientY);
+          return;
+        }
+        showPopup(text, e.clientX, e.clientY);
+      });
     }, 10);
   });
 

@@ -246,7 +246,7 @@ async function saveWord(data) {
       };
 
   await chrome.storage.local.set({ [key]: entry });
-  return { success: true };
+  return { success: true, count: entry.count };
 }
 
 async function getAllWords() {
